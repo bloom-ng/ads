@@ -9,7 +9,7 @@ class Invoice extends Model
 {
     use HasFactory;
 
-protected $fillable = [
+    protected $fillable = [
         'vat',
         'service_charge',
         'date',
@@ -19,6 +19,8 @@ protected $fillable = [
         'account_name',
         'account_number',
         'bank_name',
-        'line_items'
+        'line_items',
+        'currency',
+        'discount',
     ];
 }
