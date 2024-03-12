@@ -115,6 +115,8 @@ class InvoiceController extends Controller
             'account_number' => 'sometimes|string',
             'bank_name' => 'sometimes|string|max:255',
             'line_items' => 'sometimes|json',
+            'currency' => 'required|string',
+            'discount' => 'required',
         ]);
         $invoice = Invoice::find($id);
         $invoice->update($data);
