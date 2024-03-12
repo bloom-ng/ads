@@ -47,6 +47,8 @@ class InvoiceController extends Controller
             'account_number' => 'required|numeric',
             'bank_name' => 'required|string|max:255',
             'line_items' => 'required|json',
+            'currency' => 'required|string',
+            'discount' => 'required',
         ]);
         $input = $request->all();
         $invoice = Invoice::create($input);
@@ -102,7 +104,7 @@ class InvoiceController extends Controller
      */
     public function update(Request $request, $id)
     {
-$data = $request->validate([
+        $data = $request->validate([
             'vat' => 'sometimes|numeric',
             'date' => 'sometimes|date',
             'service_charge' => 'sometimes|numeric',
@@ -133,7 +135,7 @@ $data = $request->validate([
     public function destroy($id)
     {
         Invoice::destroy($id);
-         return response()->json([
+        return response()->json([
             'message' => "Success",
             'status' => 'success'
         ], 204);
