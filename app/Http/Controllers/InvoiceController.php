@@ -22,7 +22,11 @@ class InvoiceController extends Controller
 
         // Apply filter if search parameter is present
         if ($search) {
-            $query->where('billed_to_line_1', 'like', '%' . $search . '%')->where('billed_to_line_2', 'like', '%' . $search . '%')->where('billed_to_line_3', 'like', '%' . $search . '%');
+            $query->where(function ($query) use ($search) {
+                $query->where('billed_to_line_1', 'like', '%' . $search . '%')
+                    ->orWhere('billed_to_line_2', 'like', '%' . $search . '%')
+                    ->orWhere('billed_to_line_3', 'like', '%' . $search . '%');
+            });
         }
 
         // Paginate the results
