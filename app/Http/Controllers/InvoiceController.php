@@ -12,10 +12,23 @@ class InvoiceController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        $invoice = Invoice::latest()->paginate(20);
-        return response()->json($invoice, 200);
+        //billed_to_line_2
+        $search = $request->input('search');
+
+        // Query invoices
+        $query = Invoice::latest();
+
+        // Apply filter if search parameter is present
+        if ($search) {
+            $query->where('billed_to_line_1', 'like', '%' . $search . '%')->where('billed_to_line_2', 'like', '%' . $search . '%')->where('billed_to_line_3', 'like', '%' . $search . '%');
+        }
+
+        // Paginate the results
+        $invoices = $query->paginate(20);
+
+        return response()->json($invoices, 200);
     }
 
     /**
