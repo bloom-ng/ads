@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bloom Ads | Sign Up</title>
+    <title>Bloom Ads | Sign Up [Advertisers]</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
@@ -15,33 +15,74 @@
             </div>
         </header>
 
-        <section class="flex flex-col justify-center w-full items-center">
+        <section class="flex flex-col w-full items-center">
             <div class="relative w-[100%]">
-                <img src="/images/lines.png" alt="lines" class="w-[100%] h-full">
+                <img src="/images/lines.png" alt="lines" class="w-[100%] h-auto">
             </div>
 
-            <div class="absolute bg-gradient-to-r from-[#FFE5C680] to-[#FFBB6780] p-20 rounded-3xl items-center text-center">
-                <h1 class="text-5xl font-bold text-black mb-14">How do you plan <br>to collaborate with us?</h1>
+            <div class="absolute bg-gradient-to-r from-[#FFE5C680] to-[#FFBB6780] p-20 lg:w-[40%] rounded-3xl items-center text-center mt-24">
+                <h1 class="text-5xl font-bold text-black mb-5">Bloom Ads for <br>Direct Advertisers</h1>
+                <p class="text-2xl font-light mb-10">Please enter a valid & active email address</p>
 
-                <div class="flex flex-col items-center gap-y-5 mx-32">
-                    <a href="/signup1" class="text-center w-full p-8 border border-[#000000] rounded-3xl">
-                        <p class="text-center text-xl font-semibold">Direct Advertiser</p>
-                        <p class="text-center text-xs font-semibold">(I and my representative manages my advertising)</p>
-                    </a>
-                    
-                    <a href="/signup2" class="text-center w-full p-8  border border-[#000000] rounded-3xl">
-                        <p class="text-center text-xl font-semibold">Agency</p>
-                        <p class="text-center text-xs font-semibold">(I manage advertising on behalf of my clients)</p>
-                    </a>
+               <form class="space-y-6 w-full lg:px-5">
+                    <div class="mb-3">
+                        <label for="name"></label>
+                        <input type="text" id="name" name="name" class="w-full p-2 px-5 border border-[#000000] rounded-xl" 
+                        placeholder="Name & Surname" required>
+                    </div>
 
-                    <a href="/signup3" class="text-center w-full p-8 border border-[#000000] rounded-3xl">
-                        <p class="text-center text-xl font-semibold">Partner</p>
-                        <p class="text-center text-xs font-semibold">(I have a monthly ad budget of over 50,000 USD)</p>
-                    </a>
+                    <div class="mb-3">
+                        <label for="name"></label>
+                        <input type="text" id="name" name="name" class="w-full p-2 px-5 border border-[#000000] rounded-xl" 
+                        placeholder="Your Business Name" required>
+                    </div>
 
-                    <p class="font-semibold mt-5">Already Collaborating With Us? <a href="/login"><span class="text-[#FF8C00]">Login</span> </a></p>
+                    <div class="mb-3">
+                        <label for="email"></label>
+                        <input type="email" id="email" name="email" class="w-full p-2 px-5 border border-[#000000] rounded-xl" 
+                        placeholder="Valid Email Address" required>
+                    </div>
 
-                </div>
+                    <div class="flex flex-row mb-3 gap-3">
+                        <div class="relative w-1/2">
+                            <label for="country_code" class="sr-only">Country Code</label>
+                            <select id="country_code" name="country_code" class="w-full pr-10 px-3 p-2 border border-[#000000] rounded-xl">
+                                <option value="+1">+1</option>
+                                <option value="+44">+44</option>
+                                <option value="+91">+91</option>
+                                <option value="+91">+234</option>
+                                <option value="+91">+231</option>
+                            </select>
+                        </div>
+
+                        <div class="w-full">
+                            <label for="phone_number" class="sr-only">Phone Number</label>
+                            <input type="tel" id="phone_number" name="phone_number" class="w-full p-2 px-5 border border-[#000000] rounded-xl" placeholder="Phone Number" required>
+                        </div>
+                    </div>
+
+
+                    <div class="mb-3">
+                        <label for="website_link"></label>
+                        <input type="website_link" id="website_link" name="website_link" class="w-full p-2 px-5 border border-[#000000] rounded-xl" 
+                        placeholder="Website Link" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="country" class="sr-only">Country Code</label>
+                            <select id="country" name="country" class="w-full pr-10 px-3 p-2 border border-[#000000] rounded-xl">
+                                <option value="USA">USA</option>
+                                <option value="CANADA">CANADA</option>
+                                <option value="INDIA">INDIA</option>
+                                <option value="AUSTRALIA">AUSTRALIA</option>
+                                <option value="UK">UK</option>
+                            </select>
+                    </div>
+
+                    <button type="submit" class="w-full py-2 bg-[#FF8C00] font-semibold text-black rounded-xl">Next</button>
+
+                    <p class="font-semibold">Already Collaborating With US? <a href=""><span class="text-[#FF8C00]">Login</span> </a></p>
+               </form> 
             </div>
         </section>
         

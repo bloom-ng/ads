@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bloom Ads | Sign Up</title>
+    <title>Bloom Ads | Reset Password</title>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body>
@@ -17,41 +17,31 @@
 
         <section class="flex flex-col justify-center w-full items-center">
             <div class="relative w-[100%]">
-                <img src="/images/lines.png" alt="lines" class="w-[100%] h-full">
+                <img src="/images/lines.png" alt="lines" class="w-[100%] h-[600px]">
             </div>
 
             <div class="absolute bg-gradient-to-r from-[#FFE5C680] to-[#FFBB6780] p-20 rounded-3xl items-center text-center">
-                <h1 class="text-5xl font-bold text-black mb-14">How do you plan <br>to collaborate with us?</h1>
+                <h1 class="text-5xl font-bold text-black mb-5">Forgot Password?</h1>
+                <p class="text-2xl font-light mb-10">Enter your email and let’s help you.</p>
+               <form class="space-y-6 w-full lg:px-10">
+                    <div class="mb-3">
+                        <label for="email"></label>
+                        <input type="text" id="email" name="email" class="w-full p-2 px-5 border border-[#000000] rounded-xl" 
+                        placeholder="Email" required>
+                    </div>
 
-                <div class="flex flex-col items-center gap-y-5 mx-32">
-                    <a href="/signup1" class="text-center w-full p-8 border border-[#000000] rounded-3xl">
-                        <p class="text-center text-xl font-semibold">Direct Advertiser</p>
-                        <p class="text-center text-xs font-semibold">(I and my representative manages my advertising)</p>
-                    </a>
-                    
-                    <a href="/signup2" class="text-center w-full p-8  border border-[#000000] rounded-3xl">
-                        <p class="text-center text-xl font-semibold">Agency</p>
-                        <p class="text-center text-xs font-semibold">(I manage advertising on behalf of my clients)</p>
-                    </a>
-
-                    <a href="/signup3" class="text-center w-full p-8 border border-[#000000] rounded-3xl">
-                        <p class="text-center text-xl font-semibold">Partner</p>
-                        <p class="text-center text-xs font-semibold">(I have a monthly ad budget of over 50,000 USD)</p>
-                    </a>
-
-                    <p class="font-semibold mt-5">Already Collaborating With Us? <a href="/login"><span class="text-[#FF8C00]">Login</span> </a></p>
-
-                </div>
+                    <button type="submit" class="w-full py-2 bg-[#FF8C00] font-semibold text-black rounded-xl">Send Reset Link</button>
+               </form> 
             </div>
         </section>
         
         
         <footer class="bg-black flex flex-col w-full lg:justify-center lg:items-center lg:py-14 lg:px-0 px-10">
             <div class="flex flex-col lg:flex-row lg:space-x-10 mb-10 text-white text-[14px] lg:text-3xl">
-                <a href="">Service Agreement</a>
-                <a href="">Purchase Policy</a>
-                <a href="">Privacy Policy</a>
-                <a href="">Contact Us</a>
+                <a href="/service">Service Agreement</a>
+                <a href="/purchase">Purchase Policy</a>
+                <a href="/privacy">Privacy Policy</a>
+                <a href="/contact">Contact Us</a>
             </div>
 
             <div class="flex flex-row lg:space-x-3 mb-10">
