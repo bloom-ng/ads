@@ -25,6 +25,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::group(['middleware' => 'auth:sanctum'], function () {
     //All secure URL's
     Route::resource('/invoice', InvoiceController::class);
+    Route::resource('/receipt', \App\Http\Controllers\ReceiptController::class);
     Route::resource('/voucher', VoucherController::class);
     Route::resource('/company-info', CompanyInfoController::class);
 });
