@@ -22,5 +22,6 @@ class Receipt extends Model
         'line_items',
         'currency',
         'discount',
+        'amount_paid',
     ];
-} 
+}

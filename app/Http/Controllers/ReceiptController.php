@@ -37,6 +37,7 @@ class ReceiptController extends Controller
             'line_items' => 'required|json',
             'currency' => 'sometimes|string',
             'discount' => 'sometimes',
+            'amount_paid' => 'sometimes|numeric',
         ]);
         $input = $request->all();
         $receipt = Receipt::create($input);
@@ -79,6 +80,7 @@ class ReceiptController extends Controller
             'line_items' => 'sometimes|json',
             'currency' => 'sometimes|string',
             'discount' => 'sometimes',
+            'amount_paid' => 'sometimes|numeric',
         ]);
         $receipt = Receipt::find($id);
         $receipt->update($data);
@@ -97,4 +99,4 @@ class ReceiptController extends Controller
             'status' => 'success'
         ], 204);
     }
-} 
+}
