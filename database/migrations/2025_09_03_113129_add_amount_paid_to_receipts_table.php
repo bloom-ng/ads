@@ -14,7 +14,7 @@ class AddAmountPaidToReceiptsTable extends Migration
     public function up()
     {
         Schema::table('receipts', function (Blueprint $table) {
-            $table->float('amount_paid')->nullable();
+            $table->decimal('amount_paid', 15, 2)->default(0)->nullable();
         });
     }
 
