@@ -32,3 +32,6 @@ Route::group(['middleware' => 'auth:sanctum'], function () {
 
 Route::post('/login', [AuthController::class, 'signin']);
 Route::post('/signup', [AuthController::class, 'store']);
+
+// Public route for receipt confirmation
+Route::get('/receipt/confirm/{receiptCode}', [\App\Http\Controllers\ReceiptController::class, 'confirm']);
