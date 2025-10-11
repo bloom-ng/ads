@@ -136,8 +136,15 @@ class ReceiptController extends Controller
             ], 404);
         }
 
+        // Convert the receipt date string to DateTime and format it
+        $receiptDateTime = \DateTime::createFromFormat('Y-m-d H:i:s', $receipt->date);
+        if (!$receiptDateTime) {
+            // Try alternative format in case the date is stored differently
+            $receiptDateTime = new \DateTime($receipt->date);
+        }
+        $receiptDate = $receiptDateTime->format('Ymd');
+
         // Check if the receipt date matches the date in the code
-        $receiptDate = $receipt->date->format('Ymd');
         if ($receiptDate !== $dateCreated) {
             return response()->json([
                 'message' => 'Receipt code does not match receipt data',
@@ -152,7 +159,7 @@ class ReceiptController extends Controller
             'data' => [
                 'receipt_code' => $receiptCode,
                 'receipt_id' => $receipt->id,
-                'date_created' => $receipt->date->format('Y-m-d H:i:s'),
+                'date_created' => $receiptDateTime->format('Y-m-d H:i:s'),
                 'billed_to' => [
                     'line_1' => $receipt->billed_to_line_1,
                     'line_2' => $receipt->billed_to_line_2,
