@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\SignupController;
+use App\Http\Controllers\WebhookController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -61,3 +62,6 @@ Route::get('/forgot', function () {
 Route::get('/get-started', [SignupController::class, 'index']);
 
 Route::post('/signup', [SignupController::class, 'store'])->name('signup');
+
+Route::get('/webhook/meta', [WebhookController::class, 'verify']);
+Route::post('/webhook/meta', [WebhookController::class, 'handle']);
