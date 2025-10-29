@@ -1,0 +1,37 @@
+🎉 NEW QUALIFIED LEAD – Bloom WhatsApp Funnel
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+LEAD DETAILS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👤 Name: {{ $lead->client_name }}
+🏢 Business: {{ $lead->brand_name }}
+🏭 Industry: {{ $industry_name }}
+📦 Services: {{ $services_text }}
+💰 Budget: {{ $budget_range }}
+🎯 Goals: {{ $lead->goals }}
+⏰ Timeline: {{ $timeline }}
+📞 Contact: {{ $contact_method }}
+@if($lead->phone_number)
+📱 Phone: {{ $lead->phone_number }}
+@endif
+🏷️  Tag: {{ $lead->tag }}
+📅 Date: {{ $lead->created_at->format('M d, Y - h:i A') }}
+🆔 Lead ID: #{{ $lead->id }}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚡ ACTION REQUIRED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Please assign to the appropriate department for follow-up within 24 hours.
+
+@if(config('app.url'))
+View Full Details: {{ config('app.url') }}/admin/leads/{{ $lead->id }}
+@endif
+
+---
+Bloom Digital Media Ltd.
+Premium Marketing, Media & Technology Company
+
+This is an automated notification from the Bloom WhatsApp Flow system.
+Lead Token: {{ $lead->flow_token }}

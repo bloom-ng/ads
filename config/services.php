@@ -34,4 +34,11 @@ return [
         'verify_token' => env('META_VERIFY_TOKEN'),
     ],
 
+    'whatsapp' => [
+        'verify_token' => env('WHATSAPP_VERIFY_TOKEN'),
+        'app_secret' => env('WHATSAPP_APP_SECRET'),
+        'private_key_content' => env('WHATSAPP_PRIATE_KEY_CONTENT'),
+        'private_key_passphrase' => env('WHATSAPP_PRIVATE_KEY_PASSPHRASE'),
+    ],
+
 ];

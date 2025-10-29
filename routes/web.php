@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\SignupController;
 use App\Http\Controllers\WebhookController;
+use App\Http\Controllers\WhatsAppFlowController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -65,3 +66,19 @@ Route::post('/signup', [SignupController::class, 'store'])->name('signup');
 
 Route::get('/webhook/meta', [WebhookController::class, 'verify']);
 Route::post('/webhook/meta', [WebhookController::class, 'handle']);
+
+// WhatsApp Flow webhook endpoint (public)
+Route::post('/whatsapp/flow', [WhatsAppFlowController::class, 'handleFlow'])
+    ->name('whatsapp.flow');
+
+// Admin endpoints (add authentication middleware in production)
+// Route::prefix('admin')->middleware(['api'])->group(function () {
+//     Route::get('/leads', [WhatsAppFlowController::class, 'getAllLeads'])
+//         ->name('admin.leads.index');
+
+//     Route::get('/leads/{id}', [WhatsAppFlowController::class, 'getLead'])
+//         ->name('admin.leads.show');
+
+//     Route::get('/leads/export/csv', [WhatsAppFlowController::class, 'exportLeads'])
+//         ->name('admin.leads.export');
+// });
