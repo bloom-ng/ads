@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use phpseclib3\Crypt\RSA;
+use phpseclib3\Crypt\AES;
 
 class WhatsAppFlowController extends Controller
 {
@@ -56,19 +58,45 @@ class WhatsAppFlowController extends Controller
                 return response()->json(['error' => 'Decryption failed'], 421);
             }
 
-            // Validate structure
-            $validator = Validator::make($decryptedRequest, [
-                'version' => 'required|string',
-                'action' => 'required|string',
-                'flow_token' => 'required|string'
-            ]);
+            // Extract action early to check if it's a ping
+            $action = $decryptedRequest['action'] ?? null;
+
+            // Validate structure based on action type
+            if ($action === 'ping') {
+                // Ping only requires version and action
+                $validator = Validator::make($decryptedRequest, [
+                    'version' => 'required|string',
+                    'action' => 'required|string'
+                ]);
+            } else {
+                // All other actions require flow_token
+                $validator = Validator::make($decryptedRequest, [
+                    'version' => 'required|string',
+                    'action' => 'required|string',
+                    'flow_token' => 'required|string'
+                ]);
+            }
 
             if ($validator->fails()) {
                 Log::error('Validation failed', ['errors' => $validator->errors()]);
                 return $this->errorResponse('Invalid request structure');
             }
 
-            $action = $decryptedRequest['action'];
+            // Handle ping immediately without lead
+            if ($action === 'ping') {
+                $response = $this->handlePing();
+
+                Log::info('Flow Response', [
+                    'action' => 'ping',
+                    'status' => 'success'
+                ]);
+
+                // Encrypt and return response
+                $encryptedResponse = $this->encryptResponse($response, $request->all());
+                return response($encryptedResponse, 200)->header('Content-Type', 'text/plain');
+            }
+
+            // For non-ping actions, extract flow_token and screen/data
             $flowToken = $decryptedRequest['flow_token'];
             $screen = $decryptedRequest['screen'] ?? null;
             $data = $decryptedRequest['data'] ?? [];
@@ -81,7 +109,6 @@ class WhatsAppFlowController extends Controller
 
             // Route based on action
             $response = match ($action) {
-                'ping' => $this->handlePing(),
                 'INIT' => $this->handleInit($lead),
                 'BACK' => $this->handleBack($lead, $screen, $data),
                 'data_exchange' => $this->handleDataExchange($lead, $screen, $data),
@@ -90,7 +117,7 @@ class WhatsAppFlowController extends Controller
 
             Log::info('Flow Response', [
                 'action' => $action,
-                'screen' => $response['screen'] ?? null,
+                'screen' => $response->screen ?? null,
                 'lead_id' => $lead->id
             ]);
 
@@ -127,60 +154,116 @@ class WhatsAppFlowController extends Controller
 
     /**
      * Decrypt incoming request payload
-     * Based on Meta's encryption specification
+     * Based on Meta's encryption specification for data_api_version 3.0
      */
     private function decryptRequest(array $requestData)
     {
         try {
-            // Extract encrypted components
-            $encryptedFlowData = base64_decode($requestData['encrypted_flow_data']);
-            $encryptedAesKey = base64_decode($requestData['encrypted_aes_key']);
-            $initialVector = base64_decode($requestData['initial_vector']);
+            // Validate required fields
+            if (
+                !isset($requestData['encrypted_flow_data']) ||
+                !isset($requestData['encrypted_aes_key']) ||
+                !isset($requestData['initial_vector'])
+            ) {
+                throw new \Exception('Missing required encryption fields');
+            }
+
+            // Extract and decode encrypted components
+            $encryptedFlowData = base64_decode($requestData['encrypted_flow_data'], true);
+            $encryptedAesKey = base64_decode($requestData['encrypted_aes_key'], true);
+            $initialVector = base64_decode($requestData['initial_vector'], true);
+
+            if ($encryptedFlowData === false || $encryptedAesKey === false || $initialVector === false) {
+                throw new \Exception('Failed to decode base64 data');
+            }
+
+            Log::info('Decryption debug', [
+                'encrypted_aes_key_length' => strlen($encryptedAesKey),
+                'encrypted_flow_data_length' => strlen($encryptedFlowData),
+                'initial_vector_length' => strlen($initialVector)
+            ]);
 
             // Load private key
             $privateKeyContent = config('services.whatsapp.private_key_content');
-            $passphrase = config('services.whatsapp.private_key_passphrase', null);
+            $passphrase = config('services.whatsapp.private_key_passphrase', '');
 
-            $privateKey = openssl_pkey_get_private($privateKeyContent, $passphrase);
-
-            if (!$privateKey) {
-                throw new \Exception('Failed to load private key: ' . openssl_error_string());
+            if (empty($privateKeyContent)) {
+                throw new \Exception('Private key content is empty');
             }
 
-            // Decrypt AES key using RSA-OAEP with SHA-256
-            if (!openssl_private_decrypt(
-                $encryptedAesKey,
-                $aesKey,
-                $privateKey,
-                OPENSSL_PKCS1_OAEP_PADDING
-            )) {
-                throw new \Exception('Failed to decrypt AES key: ' . openssl_error_string());
+            // Step 1: Decrypt AES key using RSA with OAEP (SHA-256)
+            // This matches Meta's example exactly
+            try {
+                $rsa = RSA::load($privateKeyContent, $passphrase)
+                    ->withPadding(RSA::ENCRYPTION_OAEP)
+                    ->withHash('sha256')
+                    ->withMGFHash('sha256');
+
+                $aesKey = $rsa->decrypt($encryptedAesKey);
+
+                if (!$aesKey) {
+                    throw new \Exception('RSA decryption returned empty result');
+                }
+
+                Log::info('AES key decrypted successfully', [
+                    'aes_key_length' => strlen($aesKey)
+                ]);
+            } catch (\Exception $e) {
+                throw new \Exception('Failed to decrypt AES key: ' . $e->getMessage());
             }
 
-            // Separate encrypted data and authentication tag
+            // Step 2: Decrypt flow data using AES-128-GCM
             $tagLength = 16;
+
+            if (strlen($encryptedFlowData) < $tagLength) {
+                throw new \Exception('Encrypted flow data is too short');
+            }
+
             $encryptedFlowDataBody = substr($encryptedFlowData, 0, -$tagLength);
             $authTag = substr($encryptedFlowData, -$tagLength);
 
-            // Decrypt flow data using AES-128-GCM
-            $decryptedData = openssl_decrypt(
-                $encryptedFlowDataBody,
-                'aes-128-gcm',
-                $aesKey,
-                OPENSSL_RAW_DATA,
-                $initialVector,
-                $authTag
-            );
+            Log::info('Decrypting flow data', [
+                'encrypted_body_length' => strlen($encryptedFlowDataBody),
+                'auth_tag_length' => strlen($authTag),
+                'iv_length' => strlen($initialVector)
+            ]);
 
-            if ($decryptedData === false) {
-                throw new \Exception('Failed to decrypt flow data: ' . openssl_error_string());
+            try {
+                // Use phpseclib3 for AES-GCM decryption
+                $aes = new AES('gcm');
+                $aes->setKey($aesKey);
+                $aes->setNonce($initialVector);
+                $aes->setTag($authTag);
+
+                $decryptedData = $aes->decrypt($encryptedFlowDataBody);
+
+                if (!$decryptedData) {
+                    throw new \Exception('AES-GCM decryption returned empty result');
+                }
+
+                Log::info('Flow data decrypted successfully', [
+                    'decrypted_length' => strlen($decryptedData)
+                ]);
+            } catch (\Exception $e) {
+                throw new \Exception('Failed to decrypt flow data: ' . $e->getMessage());
             }
 
             // Store AES key and IV for response encryption
             $this->aesKey = $aesKey;
             $this->initialVector = $initialVector;
 
-            return json_decode($decryptedData, true);
+            // Parse JSON
+            $decodedData = json_decode($decryptedData, true);
+
+            if (json_last_error() !== JSON_ERROR_NONE) {
+                throw new \Exception('Failed to parse decrypted JSON: ' . json_last_error_msg());
+            }
+
+            Log::info('Request decrypted and parsed successfully', [
+                'action' => $decodedData['action'] ?? 'unknown'
+            ]);
+
+            return $decodedData;
         } catch (\Exception $e) {
             Log::error('Decryption error', [
                 'error' => $e->getMessage(),
@@ -197,18 +280,25 @@ class WhatsAppFlowController extends Controller
     private function encryptResponse(array $response, array $requestData)
     {
         try {
-            // Use the same AES key from request
+            // Use the same AES key and IV from request
             $aesKey = $this->aesKey;
             $initialVector = $this->initialVector;
 
-            // Flip the initialization vector (invert all bits)
-            $flippedIv = '';
-            for ($i = 0; $i < strlen($initialVector); $i++) {
-                $flippedIv .= chr(ord($initialVector[$i]) ^ 0xFF);
+            if (!$aesKey || !$initialVector) {
+                throw new \Exception('AES key or IV not available for encryption');
             }
+
+            // Flip the initialization vector (invert all bits)
+            // Use bitwise NOT operator as in Meta's example
+            $flippedIv = ~$initialVector;
 
             // Encode response as JSON
             $jsonResponse = json_encode($response);
+
+            Log::info('Encrypting response', [
+                'response_length' => strlen($jsonResponse),
+                'iv_length' => strlen($flippedIv)
+            ]);
 
             // Encrypt using AES-128-GCM with flipped IV
             $tag = '';
@@ -228,7 +318,13 @@ class WhatsAppFlowController extends Controller
             }
 
             // Append authentication tag and encode as base64
-            return base64_encode($encryptedData . $tag);
+            $encrypted = base64_encode($encryptedData . $tag);
+
+            Log::info('Response encrypted successfully', [
+                'encrypted_length' => strlen($encrypted)
+            ]);
+
+            return $encrypted;
         } catch (\Exception $e) {
             Log::error('Encryption error', [
                 'error' => $e->getMessage(),
@@ -257,7 +353,7 @@ class WhatsAppFlowController extends Controller
     {
         return [
             'version' => '3.0',
-            'data' => [
+            'data' => (object) [
                 'status' => 'active'
             ]
         ];
@@ -273,7 +369,7 @@ class WhatsAppFlowController extends Controller
         return [
             'version' => '3.0',
             'screen' => 'WELCOME',
-            'data' => []
+            'data' => (object) []
         ];
     }
 
@@ -291,7 +387,7 @@ class WhatsAppFlowController extends Controller
         return [
             'version' => '3.0',
             'screen' => $screen ?? 'WELCOME',
-            'data' => $data
+            'data' => (object) $data
         ];
     }
 
@@ -330,9 +426,9 @@ class WhatsAppFlowController extends Controller
         ]);
 
         return [
-            'version' => '3.0',
-            'screen' => $nextScreen,
-            'data' => $responseData
+            "version" => "3.0",
+            "screen" => $nextScreen,
+            "data" => $responseData
         ];
     }
 
@@ -341,12 +437,12 @@ class WhatsAppFlowController extends Controller
      */
     private function finalResponse(BloomLead $lead)
     {
-        return [
+        return (object) [
             'version' => '3.0',
             'screen' => 'SUCCESS',
-            'data' => [
-                'extension_message_response' => [
-                    'params' => [
+            'data' => (object) [
+                'extension_message_response' => (object) [
+                    'params' => (object) [
                         'flow_token' => $lead->flow_token,
                         'lead_id' => $lead->id,
                         'client_name' => $lead->client_name,
@@ -467,7 +563,8 @@ class WhatsAppFlowController extends Controller
                 break;
         }
 
-        return $data;
+        // return $data;
+        return (object) $data;
     }
 
     /**

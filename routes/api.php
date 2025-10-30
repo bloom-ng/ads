@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CompanyInfoController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\VoucherController;
+use App\Http\Controllers\WhatsAppFlowController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -35,3 +36,8 @@ Route::post('/signup', [AuthController::class, 'store']);
 
 // Public route for receipt confirmation
 Route::get('/receipt/confirm/{receiptCode}', [\App\Http\Controllers\ReceiptController::class, 'confirm']);
+
+
+// WhatsApp Flow webhook endpoint (public)
+Route::post('/whatsapp/flow', [WhatsAppFlowController::class, 'handleFlow'])
+    ->name('whatsapp.flow');
