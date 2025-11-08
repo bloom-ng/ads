@@ -7,6 +7,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
 use phpseclib3\Crypt\RSA;
 use phpseclib3\Crypt\AES;
 
@@ -689,6 +692,130 @@ class WhatsAppFlowController extends Controller
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => 'Lead not found'], 404);
         }
+    }
+
+    public function leadsPage(Request $request)
+    {
+        $query = BloomLead::query();
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->string('status'));
+        }
+
+        if ($request->filled('budget')) {
+            $query->where('budget', $request->string('budget'));
+        }
+
+        if ($request->filled('timeline')) {
+            $query->where('timeline', $request->string('timeline'));
+        }
+
+        if ($request->filled('search')) {
+            $search = $request->string('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('client_name', 'like', "%{$search}%")
+                    ->orWhere('brand_name', 'like', "%{$search}%")
+                    ->orWhere('phone_number', 'like', "%{$search}%");
+            });
+        }
+
+        $perPage = (int) $request->get('per_page', 20);
+        $leads = $query->orderByDesc('created_at')->paginate($perPage)->withQueryString();
+
+        $statuses = ['in_progress', 'qualified', 'low_budget', 'not_ready', 'completed'];
+        $budgets = ['below_300k', '300k_500k', '500k_1m', '1m_plus'];
+        $timelines = BloomLead::query()
+            ->select('timeline')
+            ->whereNotNull('timeline')
+            ->distinct()
+            ->orderBy('timeline')
+            ->pluck('timeline')
+            ->filter()
+            ->values()
+            ->all();
+
+        $filters = [
+            'status' => $request->get('status'),
+            'budget' => $request->get('budget'),
+            'timeline' => $request->get('timeline'),
+            'search' => $request->get('search'),
+            'per_page' => $perPage,
+        ];
+
+        return view('leads.index', [
+            'leads' => $leads,
+            'statuses' => $statuses,
+            'budgets' => $budgets,
+            'timelines' => $timelines,
+            'filters' => $filters,
+        ]);
+    }
+
+    public function showSendFlowForm()
+    {
+        return view('leads.send-flow');
+    }
+
+    public function sendFlowToPhone(Request $request)
+    {
+        $request->validate([
+            'phone' => ['required', 'string']
+        ]);
+
+        $phone = preg_replace('/\D+/', '', $request->input('phone'));
+
+        $token = config('services.whatsapp.access_token');
+        $phoneNumberId = config('services.whatsapp.phone_number_id');
+        $templateName = config('services.whatsapp.template_name');
+        $templateLanguage = config('services.whatsapp.template_language', 'en_US');
+
+        if (!$token || !$phoneNumberId || !$templateName || !$templateLanguage) {
+            return response('WhatsApp config missing. Please set WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_TEMPLATE_NAME, WHATSAPP_TEMPLATE_LANGUAGE.', 500);
+        }
+
+        $url = "https://graph.facebook.com/v16.0/{$phoneNumberId}/messages";
+
+        $payload = [
+            'messaging_product' => 'whatsapp',
+            'recipient_type' => 'individual',
+            'to' => $phone,
+            'type' => 'template',
+            'template' => [
+                'name' => $templateName,
+                'language' => [
+                    'code' => $templateLanguage
+                ],
+                'components' => [
+                    [
+                        'type' => 'button',
+                        'sub_type' => 'flow',
+                        'index' => '0',
+                        'parameters' => [
+                            [
+                                'type' => 'action',
+                                'action' => [
+                                    // 'flow_token' => 'FLOW_TOKEN',
+                                    // 'flow_action_data' => [
+                                        
+                                    // ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ];
+
+        $response = Http::withToken($token)
+            ->acceptJson()
+            ->asJson()
+            ->post($url, $payload);
+
+        if ($response->successful()) {
+            return response($response->body());
+        }
+
+        return response('Failed to send flow: ' . $response->body(), $response->status());
     }
 
     // Properties to store encryption keys during request lifecycle

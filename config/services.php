@@ -30,15 +30,20 @@ return [
         'region' => env('AWS_DEFAULT_REGION', 'us-east-1'),
     ],
 
-    'meta' => [
-        'verify_token' => env('META_VERIFY_TOKEN'),
-    ],
-
     'whatsapp' => [
         'verify_token' => env('WHATSAPP_VERIFY_TOKEN'),
         'app_secret' => env('WHATSAPP_APP_SECRET'),
         'private_key_content' => env('WHATSAPP_PRIVATE_KEY_CONTENT'),
         'private_key_passphrase' => env('WHATSAPP_PRIVATE_KEY_PASSPHRASE'),
+        // Sending config
+        'access_token' => env('WHATSAPP_ACCESS_TOKEN'),
+        'phone_number_id' => env('WHATSAPP_PHONE_NUMBER_ID'),
+        // Template details (flows-as-template)
+        'template_name' => env('WHATSAPP_TEMPLATE_NAME'),
+        'template_language' => env('WHATSAPP_TEMPLATE_LANGUAGE', 'en_US'),
+        // Optional: direct flow send (interactive flow)
+        'flow_id' => env('WHATSAPP_FLOW_ID'),
+        'flow_name' => env('WHATSAPP_FLOW_NAME'),
     ],
 
 ];

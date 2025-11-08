@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
@@ -15,7 +16,7 @@ class AuthController extends Controller
      */
     public function signin(Request $request)
     {
-        //
+        // API signin (token)
         $user = User::where('email', $request->email)->first();
         if($user && !Hash::check($request->password, $user->password)){
             return response()->json([
@@ -39,6 +40,31 @@ class AuthController extends Controller
         
              return response($response, 201);
         }
+    }
+
+    public function webLogin(Request $request)
+    {
+        $credentials = $request->validate([
+            'email' => ['required','email'],
+            'password' => ['required'],
+        ]);
+
+        if (Auth::attempt($credentials)) {
+            $request->session()->regenerate();
+            return redirect()->intended(route('leads.index'));
+        }
+
+        return back()->withErrors([
+            'email' => 'The provided credentials do not match our records.',
+        ])->withInput($request->only('email'));
+    }
+
+    public function logout(Request $request)
+    {
+        Auth::logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+        return redirect('/login');
     }
 
     /**

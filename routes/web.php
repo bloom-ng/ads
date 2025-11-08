@@ -3,6 +3,7 @@
 use App\Http\Controllers\SignupController;
 use App\Http\Controllers\WebhookController;
 use App\Http\Controllers\WhatsAppFlowController;
+use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -23,6 +24,9 @@ Route::get('/', function () {
 Route::get('/login', function () {
     return view('login');
 });
+
+Route::post('/login', [AuthController::class, 'webLogin'])->name('login');
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
 Route::get('/contact', function () {
     return view('contact');
@@ -71,14 +75,11 @@ Route::post('/webhook/meta', [WebhookController::class, 'handle']);
 Route::post('/whatsapp/flow', [WhatsAppFlowController::class, 'handleFlow'])
     ->name('whatsapp.flow');
 
-// Admin endpoints (add authentication middleware in production)
-// Route::prefix('admin')->middleware(['api'])->group(function () {
-//     Route::get('/leads', [WhatsAppFlowController::class, 'getAllLeads'])
-//         ->name('admin.leads.index');
+// Leads listing page (protected)
+Route::get('/leads', [WhatsAppFlowController::class, 'leadsPage'])
+    ->middleware('auth')
+    ->name('leads.index');
 
-//     Route::get('/leads/{id}', [WhatsAppFlowController::class, 'getLead'])
-//         ->name('admin.leads.show');
-
-//     Route::get('/leads/export/csv', [WhatsAppFlowController::class, 'exportLeads'])
-//         ->name('admin.leads.export');
-// });
+// Simple form to send a WhatsApp Flow to a phone number
+Route::get('/flows/send', [WhatsAppFlowController::class, 'showSendFlowForm'])->middleware('auth')->name('flows.send.form');
+Route::post('/flows/send', [WhatsAppFlowController::class, 'sendFlowToPhone'])->middleware('auth')->name('flows.send.submit');
