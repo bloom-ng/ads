@@ -80,6 +80,11 @@ Route::get('/leads', [WhatsAppFlowController::class, 'leadsPage'])
     ->middleware('auth')
     ->name('leads.index');
 
+// Leads CSV export (protected)
+Route::get('/leads/export', [WhatsAppFlowController::class, 'exportLeadsCsv'])
+    ->middleware('auth')
+    ->name('leads.export');
+
 // Simple form to send a WhatsApp Flow to a phone number
 Route::get('/flows/send', [WhatsAppFlowController::class, 'showSendFlowForm'])->middleware('auth')->name('flows.send.form');
 Route::post('/flows/send', [WhatsAppFlowController::class, 'sendFlowToPhone'])->middleware('auth')->name('flows.send.submit');

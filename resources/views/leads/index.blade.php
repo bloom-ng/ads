@@ -55,6 +55,7 @@
             </div>
             <div class="md:col-span-5 flex gap-3 justify-end">
                 <a href="{{ route('leads.index') }}" class="px-4 py-2 border rounded-md">Reset</a>
+                <a href="{{ route('leads.export', request()->query()) }}" class="px-4 py-2 rounded-md bg-green-600 text-white hover:bg-green-700">Export CSV</a>
                 <button type="submit" class="px-4 py-2 rounded-md bg-black text-white">Apply</button>
             </div>
         </form>

@@ -549,24 +549,50 @@ class WhatsAppFlowController extends Controller
      */
     private function prepareScreenData(BloomLead $lead, string $nextScreen)
     {
+        // Build complete data object with all collected information
         $data = [];
 
-        switch ($nextScreen) {
-            case 'COLLECT_BUSINESS':
-            case 'CONFIRMATION':
-                $data['client_name'] = $lead->client_name ?? '';
-                break;
-
-            case 'COLLECT_INDUSTRY':
-                $data['brand_name'] = $lead->brand_name ?? '';
-                break;
-
-            case 'BUDGET_ROUTER':
-                $data['budget'] = $lead->budget ?? '';
-                break;
+        // Always include data if it exists
+        if ($lead->client_name) {
+            $data['client_name'] = $lead->client_name;
+        }
+        
+        if ($lead->brand_name) {
+            $data['brand_name'] = $lead->brand_name;
+        }
+        
+        if ($lead->industry) {
+            $data['industry'] = $lead->industry;
+        }
+        
+        if ($lead->services) {
+            $data['services'] = is_array($lead->services) ? $lead->services : [$lead->services];
+        }
+        
+        if ($lead->budget) {
+            $data['budget'] = $lead->budget;
+        }
+        
+        if ($lead->goals) {
+            $data['goals'] = $lead->goals;
+        }
+        
+        if ($lead->timeline) {
+            $data['timeline'] = $lead->timeline;
+        }
+        
+        if ($lead->contact_method) {
+            $data['contact_method'] = $lead->contact_method;
         }
 
-        // return $data;
+        Log::info('Prepared screen data', [
+            'next_screen' => $nextScreen,
+            'data_keys' => array_keys($data),
+            'client_name' => $data['client_name'] ?? 'not set',
+            'brand_name' => $data['brand_name'] ?? 'not set'
+        ]);
+
+        // Return as object (not array) for WhatsApp Flows
         return (object) $data;
     }
 
@@ -699,19 +725,19 @@ class WhatsAppFlowController extends Controller
         $query = BloomLead::query();
 
         if ($request->filled('status')) {
-            $query->where('status', $request->string('status'));
+            $query->where('status', $request->get('status'));
         }
 
         if ($request->filled('budget')) {
-            $query->where('budget', $request->string('budget'));
+            $query->where('budget', $request->get('budget'));
         }
 
         if ($request->filled('timeline')) {
-            $query->where('timeline', $request->string('timeline'));
+            $query->where('timeline', $request->get('timeline'));
         }
 
         if ($request->filled('search')) {
-            $search = $request->string('search');
+            $search = $request->get('search');
             $query->where(function ($q) use ($search) {
                 $q->where('client_name', 'like', "%{$search}%")
                     ->orWhere('brand_name', 'like', "%{$search}%")
@@ -751,6 +777,82 @@ class WhatsAppFlowController extends Controller
         ]);
     }
 
+    public function exportLeadsCsv(Request $request)
+    {
+        $filename = 'leads_' . now()->format('Y-m-d_H-i-s') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        $callback = function () use ($request) {
+            $handle = fopen('php://output', 'w');
+
+            fputcsv($handle, [
+                'ID',
+                'Created At',
+                'Client Name',
+                'Brand Name',
+                'Industry',
+                'Services',
+                'Budget',
+                'Timeline',
+                'Contact Method',
+                'Status',
+                'Tag',
+                'Phone Number',
+            ]);
+
+            $query = BloomLead::query();
+
+            if ($request->filled('status')) {
+                $query->where('status', $request->get('status'));
+            }
+
+            if ($request->filled('budget')) {
+                $query->where('budget', $request->get('budget'));
+            }
+
+            if ($request->filled('timeline')) {
+                $query->where('timeline', $request->get('timeline'));
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->get('search');
+                $query->where(function ($q) use ($search) {
+                    $q->where('client_name', 'like', "%{$search}%")
+                        ->orWhere('brand_name', 'like', "%{$search}%")
+                        ->orWhere('phone_number', 'like', "%{$search}%");
+                });
+            }
+
+            $query->orderBy('id')->chunk(1000, function ($chunk) use ($handle) {
+                foreach ($chunk as $lead) {
+                    $services = is_array($lead->services) ? implode(', ', $lead->services) : ($lead->services ?? '');
+                    fputcsv($handle, [
+                        $lead->id,
+                        optional($lead->created_at)->format('Y-m-d H:i'),
+                        $lead->client_name ?? '',
+                        $lead->brand_name ?? '',
+                        $lead->industry_name ?? ($lead->industry ?? ''),
+                        $services,
+                        $lead->budget_range ?? ($lead->budget ?? ''),
+                        $lead->timeline ?? '',
+                        $lead->contact_method ?? '',
+                        $lead->status ?? '',
+                        $lead->tag ?? '',
+                        $lead->phone_number ?? '',
+                    ]);
+                }
+            });
+
+            fclose($handle);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
     public function showSendFlowForm()
     {
         return view('leads.send-flow');
@@ -773,7 +875,7 @@ class WhatsAppFlowController extends Controller
             return response('WhatsApp config missing. Please set WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_TEMPLATE_NAME, WHATSAPP_TEMPLATE_LANGUAGE.', 500);
         }
 
-        $url = "https://graph.facebook.com/v16.0/{$phoneNumberId}/messages";
+        $url = "https://graph.facebook.com/v21.0/{$phoneNumberId}/messages";
 
         $payload = [
             'messaging_product' => 'whatsapp',
@@ -812,11 +914,13 @@ class WhatsAppFlowController extends Controller
             ->post($url, $payload);
 
         if ($response->successful()) {
+            Log::info("Flow Sent:", ['body' => $response->body()]);
             return response($response->body());
         }
 
+        Log::warning('Failed to send flow', ['status' => $response->status(), 'body' => $response->body()]);
         return response('Failed to send flow: ' . $response->body(), $response->status());
-    }
+    }    
 
     // Properties to store encryption keys during request lifecycle
     private $aesKey;
