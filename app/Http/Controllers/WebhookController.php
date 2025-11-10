@@ -18,8 +18,6 @@ class WebhookController extends Controller
         $token = $request->get('hub_verify_token');
         $challenge = $request->get('hub_challenge');
 
-        Log::info("Mode:", $mode);
-
         if ($mode === 'subscribe' && $token === $verify_token) {
             return response($challenge, 200);
         }
