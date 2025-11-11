@@ -12,6 +12,7 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use phpseclib3\Crypt\RSA;
 use phpseclib3\Crypt\AES;
+use Illuminate\Support\Str;
 
 class WhatsAppFlowController extends Controller
 {
@@ -104,11 +105,24 @@ class WhatsAppFlowController extends Controller
             $screen = $decryptedRequest['screen'] ?? null;
             $data = $decryptedRequest['data'] ?? [];
 
-            // Get or create lead
-            $lead = BloomLead::firstOrCreate(
-                ['flow_token' => $flowToken],
-                ['raw_data' => []]
-            );
+            // Resolve lead per action: create a new row on INIT, otherwise use latest
+            if ($action === 'INIT') {
+                $lead = new BloomLead();
+                $lead->flow_token = $flowToken;
+                $lead->raw_data = [];
+                $lead->save();
+            } else {
+                $lead = BloomLead::where('flow_token', $flowToken)
+                    ->orderByDesc('id')
+                    ->first();
+
+                if (!$lead) {
+                    $lead = new BloomLead();
+                    $lead->flow_token = $flowToken;
+                    $lead->raw_data = [];
+                    $lead->save();
+                }
+            }
 
             // Route based on action
             $response = match ($action) {
@@ -861,10 +875,27 @@ class WhatsAppFlowController extends Controller
     public function sendFlowToPhone(Request $request)
     {
         $request->validate([
-            'phone' => ['required', 'string']
+            'phone' => ['nullable', 'string'],
+            'phones' => ['nullable', 'string'],
         ]);
 
-        $phone = preg_replace('/\D+/', '', $request->input('phone'));
+        $rawInput = $request->input('phones');
+        if ($rawInput === null || trim($rawInput) === '') {
+            $rawInput = $request->input('phone');
+        }
+
+        if ($rawInput === null || !is_string($rawInput) || trim($rawInput) === '') {
+            return response('Please provide at least one phone number.', 422);
+        }
+
+        $parts = preg_split('/[\s,;]+/', $rawInput, -1, PREG_SPLIT_NO_EMPTY);
+        $phones = array_values(array_unique(array_filter(array_map(function ($p) {
+            return preg_replace('/\D+/', '', $p);
+        }, $parts))));
+
+        if (empty($phones)) {
+            return response('No valid phone numbers found.', 422);
+        }
 
         $token = config('services.whatsapp.access_token');
         $phoneNumberId = config('services.whatsapp.phone_number_id');
@@ -877,49 +908,85 @@ class WhatsAppFlowController extends Controller
 
         $url = "https://graph.facebook.com/v21.0/{$phoneNumberId}/messages";
 
-        $payload = [
-            'messaging_product' => 'whatsapp',
-            'recipient_type' => 'individual',
-            'to' => $phone,
-            'type' => 'template',
-            'template' => [
-                'name' => $templateName,
-                'language' => [
-                    'code' => $templateLanguage
-                ],
-                'components' => [
-                    [
-                        'type' => 'button',
-                        'sub_type' => 'flow',
-                        'index' => '0',
-                        'parameters' => [
-                            [
-                                'type' => 'action',
-                                'action' => [
-                                    // 'flow_token' => 'FLOW_TOKEN',
-                                    // 'flow_action_data' => [
-                                        
-                                    // ]
+        $results = [];
+        foreach ($phones as $to) {
+            $flowToken = (string) Str::uuid();
+
+            // Pre-create a lead record to tie the session to a phone number immediately
+            try {
+                BloomLead::create([
+                    'flow_token' => $flowToken,
+                    'phone_number' => $to,
+                    'status' => 'in_progress',
+                    'raw_data' => [],
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to pre-create lead for flow token', ['to' => $to, 'flow_token' => $flowToken, 'error' => $e->getMessage()]);
+            }
+
+            $payload = [
+                'messaging_product' => 'whatsapp',
+                'recipient_type' => 'individual',
+                'to' => $to,
+                'type' => 'template',
+                'template' => [
+                    'name' => $templateName,
+                    'language' => [
+                        'code' => $templateLanguage
+                    ],
+                    'components' => [
+                        [
+                            'type' => 'button',
+                            'sub_type' => 'flow',
+                            'index' => '0',
+                            'parameters' => [
+                                [
+                                    'type' => 'action',
+                                    'action' => [
+                                        'flow_token' => $flowToken,
+                                        // 'flow_action_data' => [
+                                        // ]
+                                    ]
                                 ]
                             ]
                         ]
                     ]
                 ]
-            ]
-        ];
+            ];
 
-        $response = Http::withToken($token)
-            ->acceptJson()
-            ->asJson()
-            ->post($url, $payload);
+            $response = Http::withToken($token)
+                ->acceptJson()
+                ->asJson()
+                ->post($url, $payload);
 
-        if ($response->successful()) {
-            Log::info("Flow Sent:", ['body' => $response->body()]);
-            return response($response->body());
+            $ok = $response->successful();
+            $results[] = [
+                'to' => $to,
+                'ok' => $ok,
+                'status' => $response->status(),
+                'body' => $response->body(),
+            ];
+
+            if ($ok && count($phones) === 1) {
+                Log::info('Flow Sent', ['to' => $to, 'body' => $response->body()]);
+                return response($response->body(), 200);
+            }
+
+            if (!$ok) {
+                Log::warning('Failed to send flow', ['to' => $to, 'status' => $response->status(), 'body' => $response->body()]);
+            }
         }
 
-        Log::warning('Failed to send flow', ['status' => $response->status(), 'body' => $response->body()]);
-        return response('Failed to send flow: ' . $response->body(), $response->status());
+        $successCount = collect($results)->where('ok', true)->count();
+        $failCount = count($results) - $successCount;
+
+        return response()->json([
+            'message' => 'Send complete',
+            'total' => count($results),
+            'sent' => $successCount,
+            'failed' => $failCount,
+            'results' => $results,
+        ], $failCount > 0 && $successCount === 0 ? 400 : 200);
     }    
 
     // Properties to store encryption keys during request lifecycle
