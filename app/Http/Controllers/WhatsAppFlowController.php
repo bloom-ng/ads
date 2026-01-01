@@ -413,6 +413,10 @@ class WhatsAppFlowController extends Controller
      */
     private function handleDataExchange(BloomLead $lead, ?string $currentScreen, array $data)
     {
+        Log::info('Data exchange received', [
+            'lead_id' => $lead->id,
+            'current_screen' => $currentScreen
+        ]);
         // Store raw screen data
         $rawData = $lead->raw_data ?? [];
         $rawData[$currentScreen] = $data;
@@ -943,9 +947,7 @@ class WhatsAppFlowController extends Controller
                                 [
                                     'type' => 'action',
                                     'action' => [
-                                        // 'flow_token' => $flowToken,
-                                        // 'flow_action_data' => [
-                                        // ]
+                                        'flow_token' => $flowToken,
                                     ]
                                 ]
                             ]
