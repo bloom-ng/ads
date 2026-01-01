@@ -570,31 +570,31 @@ class WhatsAppFlowController extends Controller
         if ($lead->client_name) {
             $data['client_name'] = $lead->client_name;
         }
-        
+
         if ($lead->brand_name) {
             $data['brand_name'] = $lead->brand_name;
         }
-        
+
         if ($lead->industry) {
             $data['industry'] = $lead->industry;
         }
-        
+
         if ($lead->services) {
             $data['services'] = is_array($lead->services) ? $lead->services : [$lead->services];
         }
-        
+
         if ($lead->budget) {
             $data['budget'] = $lead->budget;
         }
-        
+
         if ($lead->goals) {
             $data['goals'] = $lead->goals;
         }
-        
+
         if ($lead->timeline) {
             $data['timeline'] = $lead->timeline;
         }
-        
+
         if ($lead->contact_method) {
             $data['contact_method'] = $lead->contact_method;
         }
@@ -943,7 +943,7 @@ class WhatsAppFlowController extends Controller
                                 [
                                     'type' => 'action',
                                     'action' => [
-                                        'flow_token' => $flowToken,
+                                        // 'flow_token' => $flowToken,
                                         // 'flow_action_data' => [
                                         // ]
                                     ]
@@ -987,7 +987,7 @@ class WhatsAppFlowController extends Controller
             'failed' => $failCount,
             'results' => $results,
         ], $failCount > 0 && $successCount === 0 ? 400 : 200);
-    }    
+    }
 
     // Properties to store encryption keys during request lifecycle
     private $aesKey;
