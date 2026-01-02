@@ -86,6 +86,7 @@ class WhatsAppFlowController extends Controller
                 return $this->errorResponse('Invalid request structure');
             }
 
+            Log::info('It Got Here ' . $action);
             // Handle ping immediately without lead
             if ($action === 'ping') {
                 $response = $this->handlePing();
@@ -916,10 +917,11 @@ class WhatsAppFlowController extends Controller
         foreach ($phones as $to) {
             $flowToken = (string) Str::uuid();
 
+
             // Pre-create a lead record to tie the session to a phone number immediately
             try {
                 BloomLead::create([
-                    'flow_token' => $flowToken,
+                    'flow_token' => '',
                     'phone_number' => $to,
                     'status' => 'in_progress',
                     'raw_data' => [],
@@ -947,7 +949,7 @@ class WhatsAppFlowController extends Controller
                                 [
                                     'type' => 'action',
                                     'action' => [
-                                        'flow_token' => $flowToken,
+                                        // 'flow_token' => $flowToken,
                                     ]
                                 ]
                             ]
