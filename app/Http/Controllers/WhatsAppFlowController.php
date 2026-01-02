@@ -196,11 +196,11 @@ class WhatsAppFlowController extends Controller
                 throw new \Exception('Failed to decode base64 data');
             }
 
-            Log::info('Decryption debug', [
-                'encrypted_aes_key_length' => strlen($encryptedAesKey),
-                'encrypted_flow_data_length' => strlen($encryptedFlowData),
-                'initial_vector_length' => strlen($initialVector)
-            ]);
+            // Log::info('Decryption debug', [
+            //     'encrypted_aes_key_length' => strlen($encryptedAesKey),
+            //     'encrypted_flow_data_length' => strlen($encryptedFlowData),
+            //     'initial_vector_length' => strlen($initialVector)
+            // ]);
 
             // Load private key
             $privateKeyContent = config('services.whatsapp.private_key_content');
