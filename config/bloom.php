@@ -7,6 +7,7 @@ return [
         : [
             // 'info@bloomdigitmedia.com',
             // 'agharayetseyi@bloomdigitmedia.com',
+            // 'adeniyimichael@bloomdigitmedia.com',
             'davidaremu@bloomdigitmedia.com',
         ],
 ];

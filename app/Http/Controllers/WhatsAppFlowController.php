@@ -915,13 +915,13 @@ class WhatsAppFlowController extends Controller
 
         $results = [];
         foreach ($phones as $to) {
-            $flowToken = (string) Str::uuid();
+            $flowToken = 'flows-builder-' . Str::random(10);
 
 
             // Pre-create a lead record to tie the session to a phone number immediately
             try {
                 BloomLead::create([
-                    'flow_token' => '',
+                    'flow_token' => $flowToken,
                     'phone_number' => $to,
                     'status' => 'in_progress',
                     'raw_data' => [],
@@ -949,7 +949,7 @@ class WhatsAppFlowController extends Controller
                                 [
                                     'type' => 'action',
                                     'action' => [
-                                        // 'flow_token' => $flowToken,
+                                        'flow_token' => $flowToken,
                                     ]
                                 ]
                             ]
