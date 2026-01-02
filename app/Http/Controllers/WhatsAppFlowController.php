@@ -55,7 +55,7 @@ class WhatsAppFlowController extends Controller
             }
 
             // Decrypt the request
-            Log::info('Before Decryption ' . $request->all());
+            Log::info('Before Decryption ', ['request' => $request->all()]);
             $decryptedRequest = $this->decryptRequest($request->all());
             Log::info('After Decryption ' . $decryptedRequest);
 
