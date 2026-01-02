@@ -72,21 +72,22 @@ class WhatsAppFlowController extends Controller
                     'version' => 'required|string',
                     'action' => 'required|string'
                 ]);
-            } else {
-                // All other actions require flow_token
-                $validator = Validator::make($decryptedRequest, [
-                    'version' => 'required|string',
-                    'action' => 'required|string',
-                    'flow_token' => 'required|string'
-                ]);
             }
+            // } else {
+            //     // All other actions require flow_token
+            //     $validator = Validator::make($decryptedRequest, [
+            //         'version' => 'required|string',
+            //         'action' => 'required|string',
+            //         'flow_token' => 'required|string'
+            //     ]);
+            // }
 
             if ($validator->fails()) {
                 Log::error('Validation failed', ['errors' => $validator->errors()]);
                 return $this->errorResponse('Invalid request structure');
             }
 
-            Log::info('It Got Here ' . $action);
+            // Log::info('It Got Here ' . $action);
             // Handle ping immediately without lead
             if ($action === 'ping') {
                 $response = $this->handlePing();
