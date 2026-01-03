@@ -43,9 +43,9 @@ class WhatsAppFlowController extends Controller
     {
         try {
             // Log incoming request
-            Log::info('WhatsApp Flow Request', [
-                'body' => $request->all(),
-                'signature' => $request->header('X-Hub-Signature-256')
+            Log::info('=== FLOW REQUEST START ===', [
+                'headers' => $request->headers->all(),
+                'body_raw' => $request->getContent()
             ]);
 
             // Verify signature
@@ -133,19 +133,22 @@ class WhatsAppFlowController extends Controller
                 'data_exchange' => $this->handleDataExchange($lead, $screen, $data),
                 default => throw new \Exception('Unknown action: ' . $action)
             };
-
-            Log::info('Flow Response', [
+            
+            $encryptedResponse = $this->encryptResponse($response, $request->all());
+            
+            Log::info('=== FLOW RESPONSE ===', [
                 'action' => $action,
-                'screen' => $response->screen ?? null,
-                'lead_id' => $lead->id
+                'response' => $response,
+                'encrypted_length' => strlen($encryptedResponse ?? '')
             ]);
 
             // Encrypt and return response
-            $encryptedResponse = $this->encryptResponse($response, $request->all());
             return response($encryptedResponse, 200)->header('Content-Type', 'text/plain');
         } catch (\Exception $e) {
-            Log::error('Flow Error', [
+            Log::error('=== FLOW ERROR ===', [
                 'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString()
             ]);
 
@@ -299,7 +302,6 @@ class WhatsAppFlowController extends Controller
     private function encryptResponse(array $response, array $requestData)
     {
         try {
-            // Use the same AES key and IV from request
             $aesKey = $this->aesKey;
             $initialVector = $this->initialVector;
 
@@ -307,19 +309,21 @@ class WhatsAppFlowController extends Controller
                 throw new \Exception('AES key or IV not available for encryption');
             }
 
-            // Flip the initialization vector (invert all bits)
-            // Use bitwise NOT operator as in Meta's example
+            // Flip the initialization vector
             $flippedIv = ~$initialVector;
 
             // Encode response as JSON
-            $jsonResponse = json_encode($response);
+            $jsonResponse = json_encode($response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            
+            if ($jsonResponse === false) {
+                throw new \Exception('Failed to encode response as JSON: ' . json_last_error_msg());
+            }
 
             Log::info('Encrypting response', [
-                'response_length' => strlen($jsonResponse),
-                'iv_length' => strlen($flippedIv)
+                'json_length' => strlen($jsonResponse),
+                'json' => $jsonResponse, // Log the actual JSON being encrypted
             ]);
 
-            // Encrypt using AES-128-GCM with flipped IV
             $tag = '';
             $encryptedData = openssl_encrypt(
                 $jsonResponse,
@@ -328,15 +332,19 @@ class WhatsAppFlowController extends Controller
                 OPENSSL_RAW_DATA,
                 $flippedIv,
                 $tag,
-                '', // empty AAD (Additional Authentication Data)
-                16  // 128-bit (16 byte) tag length
+                '',
+                16
             );
 
             if ($encryptedData === false) {
-                throw new \Exception('Failed to encrypt response: ' . openssl_error_string());
+                $error = openssl_error_string();
+                throw new \Exception('Failed to encrypt response: ' . $error);
             }
 
-            // Append authentication tag and encode as base64
+            if (strlen($tag) !== 16) {
+                throw new \Exception('Invalid tag length: ' . strlen($tag));
+            }
+
             $encrypted = base64_encode($encryptedData . $tag);
 
             Log::info('Response encrypted successfully', [
@@ -345,13 +353,13 @@ class WhatsAppFlowController extends Controller
 
             return $encrypted;
         } catch (\Exception $e) {
-            Log::error('Encryption error', [
+            Log::error('CRITICAL: Encryption failed', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
 
-            // Fallback: return plain JSON (not recommended for production)
-            return json_encode($response);
+            // DO NOT return plain JSON in production
+            throw $e;
         }
     }
 
@@ -383,12 +391,10 @@ class WhatsAppFlowController extends Controller
      */
     private function handleInit(BloomLead $lead)
     {
-        Log::info('Flow initialized', ['lead_id' => $lead->id]);
-
         return [
             'version' => '3.0',
             'screen' => 'WELCOME',
-            'data' => (object) []
+            'data' => new \stdClass() // Use new \stdClass() instead of (object) []
         ];
     }
 
@@ -417,8 +423,10 @@ class WhatsAppFlowController extends Controller
     {
         Log::info('Data exchange received', [
             'lead_id' => $lead->id,
-            'current_screen' => $currentScreen
+            'current_screen' => $currentScreen,
+            'data' => $data
         ]);
+
         // Store raw screen data
         $rawData = $lead->raw_data ?? [];
         $rawData[$currentScreen] = $data;
@@ -427,25 +435,47 @@ class WhatsAppFlowController extends Controller
         // Update lead fields
         $this->updateLeadFields($lead, $data);
 
-        // Determine next screen
-        $nextScreen = $this->getNextScreen($lead, $currentScreen, $data);
+        // FOR BUDGET_ROUTER: Skip it and route directly
+        if ($currentScreen === 'SELECT_BUDGET') {
+            $nextScreen = $this->routeFromBudgetRouter($lead);
+        } else {
+            $nextScreen = $this->getNextScreen($lead, $currentScreen, $data);
+        }
 
         // Check if flow should complete
-        if ($nextScreen === 'SUCCESS') {
+        if (in_array($nextScreen, ['SUCCESS', 'NOT_READY_END', 'LOW_BUDGET_END'])) {
             $lead->save();
             return $this->finalResponse($lead);
+        }
+
+        // Check if current screen is terminal
+        if (in_array($currentScreen, ['NOT_READY_END', 'LOW_BUDGET_END', 'CONFIRMATION'])) {
+            $lead->save();
+            
+            // Return a completion response, not a new screen
+            return [
+                'version' => '3.0',
+                'data' => (object) [
+                    'extension_message_response' => (object) [
+                        'params' => (object) [
+                            'flow_token' => $lead->flow_token,
+                            'lead_id' => $lead->id
+                        ]
+                    ]
+                ]
+            ];
         }
 
         // Prepare data for next screen
         $responseData = $this->prepareScreenData($lead, $nextScreen);
 
-        // Save lead
         $lead->save();
 
-        Log::info('Data Exchange', [
+        Log::info('Data Exchange complete', [
             'lead_id' => $lead->id,
             'current_screen' => $currentScreen,
-            'next_screen' => $nextScreen
+            'next_screen' => $nextScreen,
+            'response_data' => $responseData
         ]);
 
         return [
@@ -516,12 +546,11 @@ class WhatsAppFlowController extends Controller
             'COLLECT_BUSINESS' => 'COLLECT_INDUSTRY',
             'COLLECT_INDUSTRY' => 'SELECT_SERVICES',
             'SELECT_SERVICES' => 'SELECT_BUDGET',
-            'SELECT_BUDGET' => 'BUDGET_ROUTER',
-            'BUDGET_ROUTER' => $this->routeFromBudgetRouter($lead),
+            'SELECT_BUDGET' => $this->routeFromBudgetRouter($lead), // Route directly
             'COLLECT_GOALS' => 'SELECT_TIMELINE',
             'SELECT_TIMELINE' => 'SELECT_CONTACT',
             'SELECT_CONTACT' => $this->routeToConfirmation($lead),
-            'CONFIRMATION' => 'SUCCESS', // Flow completion
+            'CONFIRMATION' => 'SUCCESS',
             default => 'WELCOME'
         };
     }
@@ -574,45 +603,45 @@ class WhatsAppFlowController extends Controller
 
         // Always include data if it exists
         if ($lead->client_name) {
-            $data['client_name'] = $lead->client_name;
+            $data['client_name'] = (string) $lead->client_name;
         }
 
         if ($lead->brand_name) {
-            $data['brand_name'] = $lead->brand_name;
+            $data['brand_name'] = (string) $lead->brand_name;
         }
 
         if ($lead->industry) {
-            $data['industry'] = $lead->industry;
+            $data['industry'] = (string) $lead->industry;
         }
 
         if ($lead->services) {
-            $data['services'] = is_array($lead->services) ? $lead->services : [$lead->services];
+            // CRITICAL: Always ensure it's an array
+            $data['services'] = is_array($lead->services)
+                ? array_values($lead->services) // Ensure numeric keys
+                : [$lead->services];
         }
 
         if ($lead->budget) {
-            $data['budget'] = $lead->budget;
+            $data['budget'] = (string) $lead->budget;
         }
 
         if ($lead->goals) {
-            $data['goals'] = $lead->goals;
+            $data['goals'] = (string) $lead->goals;
         }
 
         if ($lead->timeline) {
-            $data['timeline'] = $lead->timeline;
+            $data['timeline'] = (string) $lead->timeline;
         }
 
         if ($lead->contact_method) {
-            $data['contact_method'] = $lead->contact_method;
+            $data['contact_method'] = (string) $lead->contact_method;
         }
 
         Log::info('Prepared screen data', [
             'next_screen' => $nextScreen,
-            'data_keys' => array_keys($data),
-            'client_name' => $data['client_name'] ?? 'not set',
-            'brand_name' => $data['brand_name'] ?? 'not set'
+            'data' => $data, // Log the actual data being sent
         ]);
 
-        // Return as object (not array) for WhatsApp Flows
         return (object) $data;
     }
 
