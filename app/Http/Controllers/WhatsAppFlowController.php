@@ -41,7 +41,7 @@ class WhatsAppFlowController extends Controller
      */
     public function handleFlow(Request $request)
     {
-        // try {
+        try {
             // Log incoming request
             Log::info('=== FLOW REQUEST START ===', [
                 'headers' => $request->headers->all(),
@@ -144,16 +144,16 @@ class WhatsAppFlowController extends Controller
 
             // Encrypt and return response
             return response($encryptedResponse, 200)->header('Content-Type', 'text/plain');
-        // } catch (\Exception $e) {
-        //     Log::error('=== FLOW ERROR ===', [
-        //         'message' => $e->getMessage(),
-        //         'file' => $e->getFile(),
-        //         'line' => $e->getLine(),
-        //         'trace' => $e->getTraceAsString()
-        //     ]);
+        } catch (\Exception $e) {
+            Log::error('=== FLOW ERROR ===', [
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString()
+            ]);
 
-        //     return $this->errorResponse('Internal error: ' . $e->getMessage(), 500);
-        // }
+            return $this->errorResponse('Internal error: ' . $e->getMessage(), 500);
+        }
     }
 
     /**
