@@ -145,6 +145,13 @@ class ReceiptController extends Controller
         $receiptDate = $receiptDateTime->format('Ymd');
 
         // Check if the receipt date matches the date in the code
+
+        Log::info('=== CONFIRMING RECEIPT ===', [
+            'receipt_date' => $receiptDate,
+            'date_created' => $dateCreated,
+            'receipt_id' => $receiptId,
+            'receipt_code' => $receiptCode
+        ]);
         if ($receiptDate !== $dateCreated) {
             return response()->json([
                 'message' => 'Receipt code does not match receipt data',
