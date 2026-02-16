@@ -137,11 +137,11 @@ class ReceiptController extends Controller
             ], 404);
         }
 
-        // Convert the receipt date string to DateTime and format it
-        $receiptDateTime = \DateTime::createFromFormat('Y-m-d H:i:s', $receipt->date);
+        // Convert the receipt created_at date string to DateTime and format it
+        $receiptDateTime = $receipt->created_at;
         if (!$receiptDateTime) {
-            // Try alternative format in case the date is stored differently
-            $receiptDateTime = new \DateTime($receipt->date);
+             // Fallback if created_at is not set (unlikely for Eloquent models)
+             $receiptDateTime = new \DateTime($receipt->date);
         }
         $receiptDate = $receiptDateTime->format('Ymd');
 
