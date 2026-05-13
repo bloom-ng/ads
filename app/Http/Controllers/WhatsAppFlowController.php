@@ -975,8 +975,7 @@ class WhatsAppFlowController extends Controller
                                 [
                                     'type' => 'action',
                                     'action' => [
-                                        'flow_token' => $flowToken,
-                                        'flow_action' => 'data_exchange'
+                                        'flow_token' => $flowToken
                                     ]
                                 ]
                             ]
