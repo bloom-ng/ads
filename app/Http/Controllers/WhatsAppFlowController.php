@@ -435,12 +435,7 @@ class WhatsAppFlowController extends Controller
         // Update lead fields
         $this->updateLeadFields($lead, $data);
 
-        // FOR BUDGET_ROUTER: Skip it and route directly
-        if ($currentScreen === 'SELECT_BUDGET') {
-            $nextScreen = $this->routeFromBudgetRouter($lead);
-        } else {
-            $nextScreen = $this->getNextScreen($lead, $currentScreen, $data);
-        }
+        $nextScreen = $this->getNextScreen($lead, $currentScreen, $data);
 
         // Check if flow should complete
         if (in_array($nextScreen, ['SUCCESS', 'NOT_READY_END', 'LOW_BUDGET_END'])) {
@@ -546,7 +541,8 @@ class WhatsAppFlowController extends Controller
             'COLLECT_BUSINESS' => 'COLLECT_INDUSTRY',
             'COLLECT_INDUSTRY' => 'SELECT_SERVICES',
             'SELECT_SERVICES' => 'SELECT_BUDGET',
-            'SELECT_BUDGET' => $this->routeFromBudgetRouter($lead), // Route directly
+            'SELECT_BUDGET' => 'BUDGET_ROUTER',
+            'BUDGET_ROUTER' => $this->routeFromBudgetRouter($lead),
             'COLLECT_GOALS' => 'SELECT_TIMELINE',
             'SELECT_TIMELINE' => 'SELECT_CONTACT',
             'SELECT_CONTACT' => $this->routeToConfirmation($lead),
@@ -941,7 +937,7 @@ class WhatsAppFlowController extends Controller
             return response('WhatsApp config missing. Please set WHATSAPP_ACCESS_TOKEN, WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_TEMPLATE_NAME, WHATSAPP_TEMPLATE_LANGUAGE.', 500);
         }
 
-        $url = "https://graph.facebook.com/v21.0/{$phoneNumberId}/messages";
+        $url = "https://graph.facebook.com/v24.0/{$phoneNumberId}/messages";
 
         $results = [];
         foreach ($phones as $to) {
