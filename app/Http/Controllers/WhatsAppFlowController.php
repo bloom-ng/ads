@@ -107,23 +107,20 @@ class WhatsAppFlowController extends Controller
             $screen = $decryptedRequest['screen'] ?? null;
             $data = $decryptedRequest['data'] ?? [];
 
-            // Resolve lead per action: create a new row on INIT, otherwise use latest
-            if ($action === 'INIT') {
+            // Resolve lead: reuse an existing row for this flow_token if one was already
+            // pre-created (e.g. by sendFlowToPhone when the template was sent), otherwise
+            // create a new one. Previously INIT always inserted a fresh row unconditionally,
+            // which violated the flow_token unique constraint whenever a lead had already
+            // been pre-created for that token.
+            $lead = BloomLead::where('flow_token', $flowToken)
+                ->orderByDesc('id')
+                ->first();
+
+            if (!$lead) {
                 $lead = new BloomLead();
                 $lead->flow_token = $flowToken;
                 $lead->raw_data = [];
                 $lead->save();
-            } else {
-                $lead = BloomLead::where('flow_token', $flowToken)
-                    ->orderByDesc('id')
-                    ->first();
-
-                if (!$lead) {
-                    $lead = new BloomLead();
-                    $lead->flow_token = $flowToken;
-                    $lead->raw_data = [];
-                    $lead->save();
-                }
             }
 
             // Route based on action
@@ -133,7 +130,7 @@ class WhatsAppFlowController extends Controller
                 'data_exchange' => $this->handleDataExchange($lead, $screen, $data),
                 default => throw new \Exception('Unknown action: ' . $action)
             };
-            
+
             $encryptedResponse = $this->encryptResponse($response, $request->all());
 
             Log::info('=== FLOW RESPONSE ===', [
@@ -314,7 +311,7 @@ class WhatsAppFlowController extends Controller
 
             // Encode response as JSON
             $jsonResponse = json_encode($response, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
-            
+
             if ($jsonResponse === false) {
                 throw new \Exception('Failed to encode response as JSON: ' . json_last_error_msg());
             }
@@ -446,7 +443,7 @@ class WhatsAppFlowController extends Controller
         // Check if current screen is terminal
         if (in_array($currentScreen, ['NOT_READY_END', 'LOW_BUDGET_END', 'CONFIRMATION'])) {
             $lead->save();
-            
+
             // Return a completion response, not a new screen
             return [
                 'version' => '3.0',
